@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"fmt"
+	"github.com/cyprienhm/http-server-go/internal/httpconstants"
 	"net"
 	"os"
 	"regexp"
@@ -14,14 +15,6 @@ import (
 // Ensures gofmt doesn't remove the "net" and "os" imports above (feel free to remove this!)
 var _ = net.Listen
 var _ = os.Exit
-
-const HTTP_VER = "HTTP/1.1"
-const CRLF = "\r\n"
-
-const RESPONSE_200 = "200 OK"
-const RESPONSE_201 = "201 Created"
-const RESPONSE_400 = "400 Bad Request"
-const RESPONSE_404 = "404 Not Found"
 
 type HTTPRequest struct {
 	method        string
@@ -53,6 +46,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Println("Listening for HTTP requests on port 4221.")
+
 	running := true
 
 	for running {
@@ -69,8 +64,8 @@ func parseRequest(request []byte) HTTPRequest {
 	var httpRequest HTTPRequest
 	httpRequest.headers = make(map[string]string)
 	strBuffer := string(request)
-	header, body, _ := strings.Cut(strBuffer, CRLF+CRLF)
-	splitHeaders := strings.Split(header, CRLF)
+	header, body, _ := strings.Cut(strBuffer, httpconstants.CRLF+httpconstants.CRLF)
+	splitHeaders := strings.Split(header, httpconstants.CRLF)
 	firstLine := splitHeaders[0]
 	firstLineTokens := strings.Split(firstLine, " ")
 	if len(firstLineTokens) < 3 {
@@ -119,7 +114,7 @@ func processRequest(connection net.Conn) {
 		processPOST(request, &response)
 	default:
 		fmt.Println("Did not recognize method: ", request.method)
-		response.status = RESPONSE_404
+		response.status = httpconstants.RESPONSE_404
 	}
 
 	acceptedEncodings, ok := request.headers["Accept-Encoding"]
@@ -159,22 +154,22 @@ func processPOST(request HTTPRequest, response *HTTPResponse) {
 
 		contentLength, err := strconv.Atoi(request.headers["Content-Length"])
 		if err != nil || contentLength == 0 {
-			response.status = RESPONSE_400
+			response.status = httpconstants.RESPONSE_400
 			return
 		}
 		fmt.Println("going to write exactly", contentLength, "bytes")
 
 		err = os.WriteFile(directory+"/"+requestedFile, []byte(request.body[:contentLength]), 0666)
 		if err != nil {
-			response.status = RESPONSE_404
+			response.status = httpconstants.RESPONSE_404
 			return
 		}
-		response.status = RESPONSE_201
+		response.status = httpconstants.RESPONSE_201
 		request.body = ""
 		return
 	}
 
-	response.status = RESPONSE_404
+	response.status = httpconstants.RESPONSE_404
 	response.body = ""
 }
 
@@ -185,7 +180,7 @@ func processGET(request HTTPRequest, response *HTTPResponse) {
 	fmt.Println("Requested URL: ", requestedURI)
 
 	if requestedURI == "/" {
-		response.status = RESPONSE_200
+		response.status = httpconstants.RESPONSE_200
 		response.body = ""
 		return
 	}
@@ -193,7 +188,7 @@ func processGET(request HTTPRequest, response *HTTPResponse) {
 	echoRegex, _ := regexp.Compile("/echo/.*")
 	if echoRegex.Match([]byte(requestedURI)) {
 		echoBack, _ := strings.CutPrefix(requestedURI, "/echo/")
-		response.status = RESPONSE_200
+		response.status = httpconstants.RESPONSE_200
 		response.headers["Content-Type"] = "text/plain"
 		response.headers["Content-Length"] = strconv.Itoa(len(echoBack))
 		response.body = echoBack
@@ -203,7 +198,7 @@ func processGET(request HTTPRequest, response *HTTPResponse) {
 	userAgentRegex, _ := regexp.Compile("/user-agent?")
 	if userAgentRegex.Match([]byte(requestedURI)) {
 		userAgent := request.headers["User-Agent"]
-		response.status = RESPONSE_200
+		response.status = httpconstants.RESPONSE_200
 		response.headers["Content-Type"] = "text/plain"
 		response.headers["Content-Length"] = strconv.Itoa(len(userAgent))
 		response.body = userAgent
@@ -216,28 +211,28 @@ func processGET(request HTTPRequest, response *HTTPResponse) {
 
 		fileContents, err := os.ReadFile(directory + "/" + requestedFile)
 		if err != nil {
-			response.status = RESPONSE_404
+			response.status = httpconstants.RESPONSE_404
 			return
 		}
-		response.status = RESPONSE_200
+		response.status = httpconstants.RESPONSE_200
 		response.headers["Content-Type"] = "application/octet-stream"
 		response.headers["Content-Length"] = strconv.Itoa(len(fileContents))
 		response.body = string(fileContents)
 		return
 	}
 
-	response.status = RESPONSE_404
+	response.status = httpconstants.RESPONSE_404
 	response.body = ""
 }
 
 func writeResponse(statusCode string, conn net.Conn) {
 	var response strings.Builder
 
-	response.WriteString(HTTP_VER)
+	response.WriteString(httpconstants.HTTP_VER)
 	response.WriteString(" ")
 	response.WriteString(statusCode)
-	response.WriteString(CRLF)
-	response.WriteString(CRLF)
+	response.WriteString(httpconstants.CRLF)
+	response.WriteString(httpconstants.CRLF)
 
 	conn.Write([]byte(response.String()))
 }
@@ -245,17 +240,17 @@ func writeResponse(statusCode string, conn net.Conn) {
 func sendHTTPResponse(response HTTPResponse, conn net.Conn) {
 	var toSend strings.Builder
 
-	toSend.WriteString(HTTP_VER)
+	toSend.WriteString(httpconstants.HTTP_VER)
 	toSend.WriteString(" ")
 	toSend.WriteString(response.status)
-	toSend.WriteString(CRLF)
+	toSend.WriteString(httpconstants.CRLF)
 	for k, v := range response.headers {
 		toSend.WriteString(k)
 		toSend.WriteString(": ")
 		toSend.WriteString(v)
-		toSend.WriteString(CRLF)
+		toSend.WriteString(httpconstants.CRLF)
 	}
-	toSend.WriteString(CRLF)
+	toSend.WriteString(httpconstants.CRLF)
 	toSend.WriteString(response.body)
 	fmt.Println("Sending response:-")
 	fmt.Println(toSend.String())
