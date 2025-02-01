@@ -36,6 +36,7 @@ func main() {
 		for i := 1; i < len(os.Args)-1; i += 2 {
 			if os.Args[i] == "--dir" || os.Args[i] == "--directory" {
 				directory = os.Args[i+1]
+				fmt.Println("Serving files from: ", directory)
 			}
 		}
 	}
@@ -215,7 +216,8 @@ func processGET(request HTTPRequest, response *HTTPResponse) {
 			return
 		}
 		response.status = httpconstants.RESPONSE_200
-		response.headers["Content-Type"] = "application/octet-stream"
+		// response.headers["Content-Type"] = "application/octet-stream"
+		response.headers["Content-Type"] = "text/html"
 		response.headers["Content-Length"] = strconv.Itoa(len(fileContents))
 		response.body = string(fileContents)
 		return
